@@ -190,7 +190,7 @@ def scrape_bing(count):
         jsons = get_json(ticker, count)
         descriptions, links, published = get_links(jsons)
 
-       \
+       
         content = pool.map(parse_website, links)
         titles, summaries = zip(*content)
 
