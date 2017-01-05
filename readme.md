@@ -31,3 +31,10 @@ AAPL.csv
 >>
 - Buffer only (returns tuple)
 > python main.py AAPL -b
+
+
+
+####Init
+-create tables
+> python main.py --init
+>>

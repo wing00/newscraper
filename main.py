@@ -3,8 +3,6 @@ import configparser
 import json
 import csv
 import requests
-import certifi
-import urllib3
 import psycopg2
 from readability import Document
 from bs4 import BeautifulSoup
@@ -86,7 +84,7 @@ def get_links(search_json):
     :rtype: (list, list)
     :return: lists of all descriptions and urls
     """
-    descriptions, urls, published = zip(*[(query['description'], query['url'], query['datePublished']) for query in search_json['value']])
+    descriptions, urls, published = zip(*((query['description'], query['url'], query['datePublished']) for query in search_json['value']))
     return descriptions, urls, published
 
 
@@ -98,18 +96,11 @@ def parse_website(url):
     :return: title and summary of article
     :rtype: (string, string)
     """
-    try:
-        http = urllib3.PoolManager(
-            cert_reqs='CERT_REQUIRED',
-            ca_certs=certifi.where())
 
-        http.request('GET',
+    response = requests.get(
                      url,
                      headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'},  # sneaky like a ninja
-                     verify=False
                      )
-    except:
-        return None, None
 
     if response.status_code == requests.codes.ok:
         doc = Document(response.text)
