@@ -1,7 +1,10 @@
+import argparse
 import configparser
 import json
 import csv
 import requests
+import certifi
+import urllib3
 import psycopg2
 from readability import Document
 from bs4 import BeautifulSoup
@@ -24,6 +27,20 @@ def config():
     configuration = configparser.RawConfigParser()
     configuration.read('settings.ini')
     return configuration
+
+
+def parse_args():
+    """
+    Reads
+    :return:
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-s', '--scrape', nargs='?', type=int, default=200, help='scrapes bing. add int value to change from default (200)')
+    parser.add_argument('--init', action='store_true', help='initializes tables in postgres')
+    parser.add_argument('ticker', nargs='?', help='returns all matches for ticker')
+    parser.add_argument('-b', '--buffer', action='store_false', help='dumps results to buffer')
+
+    return parser.parse_args()
 
 
 def postgres():
@@ -81,9 +98,19 @@ def parse_website(url):
     :return: title and summary of article
     :rtype: (string, string)
     """
-    response = requests.get(url,
-                            headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}  # sneaky like a ninja
-                            )
+    try:
+        http = urllib3.PoolManager(
+            cert_reqs='CERT_REQUIRED',
+            ca_certs=certifi.where())
+
+        http.request('GET',
+                     url,
+                     headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'},  # sneaky like a ninja
+                     verify=False
+                     )
+    except:
+        return None, None
+
     if response.status_code == requests.codes.ok:
         doc = Document(response.text)
         soup = BeautifulSoup(doc.summary(), 'lxml')
@@ -96,7 +123,8 @@ def parse_website(url):
         return None, None
 
 
-def create_tables(connect):
+def create_tables():
+    connect = postgres()
     cur = connect.cursor()
     cur.execute("""CREATE TABLE articles(
       id          SERIAL      PRIMARY KEY,
@@ -115,7 +143,6 @@ def create_tables(connect):
 
 def save_data(datas):
     """
-
     Saves data from scrape to postgres
 
     :param datas: list of tuples
@@ -132,6 +159,7 @@ def save_data(datas):
 
     connect.commit()
     connect.close()
+    print('saved {}'.format(datas[0][0]))
 
 
 def get_data(ticker, save_csv=True):
@@ -147,7 +175,6 @@ def get_data(ticker, save_csv=True):
     cur.execute(query, {'ticker': ticker})
     fetches = cur.fetchall()
     connect.close()
-
 
     if save_csv:
         with open(ticker + '.csv', 'w') as f:
@@ -166,10 +193,7 @@ def scrape_bing(count):
     with open('tickers.json') as f:
         tickers = json.load(f)
 
-    # conn = postgres()
-    # create_tables(conn)
-
-    for ticker, company in tickers[0:1]:
+    for ticker, company in tickers:
         jsons = get_json(ticker, count)
         descriptions, links, published = get_links(jsons)
 
@@ -184,5 +208,11 @@ def scrape_bing(count):
 
 if __name__ == '__main__':
     settings = config()
-#    scrape_bing()
-    get_data('ADS')
+    args = parse_args()
+
+    if args.ticker:
+        get_data(args.ticker, args.buffer)
+    elif args.init:
+        create_tables()
+    elif args.scrape:
+        scrape_bing(args.scrape)
