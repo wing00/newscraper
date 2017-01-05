@@ -184,11 +184,13 @@ def scrape_bing(count):
     with open('tickers.json') as f:
         tickers = json.load(f)
 
+    pool = Pool()
+
     for ticker, company in tickers:
         jsons = get_json(ticker, count)
         descriptions, links, published = get_links(jsons)
 
-        pool = Pool()
+       \
         content = pool.map(parse_website, links)
         titles, summaries = zip(*content)
 
